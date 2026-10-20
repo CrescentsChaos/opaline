@@ -19,6 +19,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Vendor ffmpeg.wasm (served from your own site, so workers load)
+        run: |
+          mkdir /tmp/vendor && cd /tmp/vendor && npm init -y >/dev/null
+          npm install @ffmpeg/ffmpeg@0.12.10 @ffmpeg/core@0.12.6
+          cd "$GITHUB_WORKSPACE"
+          mkdir -p public/vendor/ffmpeg
+          cp /tmp/vendor/node_modules/@ffmpeg/ffmpeg/dist/umd/* public/vendor/ffmpeg/
+          cp /tmp/vendor/node_modules/@ffmpeg/core/dist/umd/ffmpeg-core.js /tmp/vendor/node_modules/@ffmpeg/core/dist/umd/ffmpeg-core.wasm public/vendor/ffmpeg/
+          ls -la public/vendor/ffmpeg
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public

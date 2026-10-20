@@ -89,62 +89,114 @@ const follow = (id, onProgress) => new Promise((ok, no) => {
   es.onerror = () => { if (!end) { es.close(); no(new Error('Lost connection to the server.')); } };
 });
 
-/* ---------- flow 1: images (converted in the browser, nothing uploaded) ---------- */
-const FMT = { jpg: 'JPG', png: 'PNG', webp: 'WebP' };
-const MIME = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
-async function convertImage(file, fmt) {
-  let bmp;
+/* ---------- formats ---------- */
+const set = (s) => new Set(s.split(' '));
+const IMG_IN = set('apng avif bmp bw cur dds dib exr gif hdr icb ico j2k jfif jp2 jpe jpf jpg jpx pam pbm pcx pgm pic png pnm ppm psd ras rgb rgba sgi sun svg tga tif tiff vda vst webp xbm xwd'), AUD_IN = set('3ga 8svx aac ac3 adts adx aif aifc aiff amr ape ast au bit caf dfpwm dsf dts eac3 ec3 flac gsm iff m4a m4b mka mmf mp1 mp2 mp3 mpa mpc oga ogg oma opus paf pvf ra rso sds sf snd sox sph spx tak tco thd truehd tta voc w64 wav wave wma wv'), VID_IN = set('264 265 3g2 3gp amv asf avc avi avs bik dav divx dv f4v flc fli flv gxf h264 h265 hevc ismv ivf lxf m1v m2ts m2v m4v mjpeg mjpg mkv mod moflex mov mp4 mpe mpeg mpg mts mve mvi mxf nsv nut ogm ogv qt rm rmvb roq rpl smk thp tod tp trp ts txd vc1 vob webm wmv wtv y4m yuv');
+const kindOf = (e) => (IMG_IN.has(e) ? 'image' : VID_IN.has(e) ? 'video' : AUD_IN.has(e) ? 'audio' : null);
+const X264 = ['-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '27', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k'];
+const IMG_OUT = {
+  jpg: ['-c:v', 'mjpeg', '-q:v', '2'], png: ['-c:v', 'png'], webp: ['-c:v', 'libwebp', '-quality', '90'],
+  gif: ['-c:v', 'gif'], bmp: ['-c:v', 'bmp'], tiff: ['-c:v', 'tiff'], tga: ['-c:v', 'targa'], ppm: ['-c:v', 'ppm'],
+  pgm: ['-c:v', 'pgm', '-pix_fmt', 'gray'], pcx: ['-c:v', 'pcx'], jp2: ['-c:v', 'jpeg2000'], sgi: ['-c:v', 'sgi'],
+  pam: ['-c:v', 'pam'], apng: ['-c:v', 'apng'],
+  ico: ['-vf', 'scale=w=256:h=256:force_original_aspect_ratio=decrease', '-c:v', 'bmp'],
+};
+const AUD_OUT = {
+  mp3: ['-c:a', 'libmp3lame', '-b:a', '192k'], wav: ['-c:a', 'pcm_s16le'], flac: ['-c:a', 'flac'],
+  ogg: ['-c:a', 'libvorbis', '-q:a', '5'], opus: ['-c:a', 'libopus', '-b:a', '128k'], aac: ['-c:a', 'aac', '-b:a', '192k'],
+  m4a: ['-c:a', 'aac', '-b:a', '192k'], wma: ['-c:a', 'wmav2', '-b:a', '192k'], aiff: ['-c:a', 'pcm_s16be'],
+  ac3: ['-c:a', 'ac3', '-b:a', '192k'], mp2: ['-c:a', 'mp2', '-b:a', '192k'], au: ['-c:a', 'pcm_s16be'],
+  mka: ['-c:a', 'libvorbis', '-q:a', '5'],
+};
+const VID_OUT = {
+  mp4: [...X264, '-movflags', '+faststart'], m4v: X264, mkv: X264, mov: X264, ts: X264,
+  avi: ['-c:v', 'mpeg4', '-q:v', '5', '-c:a', 'libmp3lame', '-b:a', '192k'],
+  webm: ['-c:v', 'libvpx', '-b:v', '1M', '-deadline', 'realtime', '-cpu-used', '8', '-c:a', 'libvorbis'],
+  flv: ['-c:v', 'flv', '-c:a', 'libmp3lame', '-ar', '44100'],
+  ogv: ['-c:v', 'libtheora', '-q:v', '6', '-c:a', 'libvorbis'],
+  mpg: ['-c:v', 'mpeg2video', '-q:v', '4', '-c:a', 'mp2'],
+  wmv: ['-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', '-c:v', 'wmv2', '-c:a', 'wmav2'],
+  gif: ['-an', '-vf', 'fps=12,scale=480:-1:flags=lanczos', '-loop', '0'],
+};
+const OUT = { image: Object.keys(IMG_OUT), audio: Object.keys(AUD_OUT), video: [...Object.keys(VID_OUT), ...Object.keys(AUD_OUT)] };
+const POPULAR = { image: ['webp', 'png', 'jpg', 'gif'], audio: ['mp3', 'wav', 'flac', 'ogg'], video: ['mp3', 'mp4', 'webm', 'gif'] };
+const ffArgs = (kind, t) => (kind === 'image' ? IMG_OUT[t] : kind === 'video' && VID_OUT[t] ? VID_OUT[t] : ['-vn', ...AUD_OUT[t]]);
+const FF_IMG = set('png jpg bmp tiff tif tga ppm pgm pnm pam pcx sgi gif webp psd exr jp2 dds hdr ico');   // ffmpeg can read these directly
+
+/* ---------- images: the browser's canvas is the fast path ---------- */
+const NATIVE = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
+async function decodeImage(file) {
   try {
-    try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
-    catch { bmp = await createImageBitmap(file); }
-    const c = document.createElement('canvas');
-    c.width = bmp.width; c.height = bmp.height;
-    const ctx = c.getContext('2d');
-    if (fmt === 'jpg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); }   // JPG has no transparency
-    ctx.drawImage(bmp, 0, 0);
-    bmp.close();
-    const blob = await new Promise((r) => c.toBlob(r, MIME[fmt], 0.92));
-    if (!blob) throw new Error();
-    if (blob.type !== MIME[fmt]) return Promise.reject(new Error(`This browser cannot save ${FMT[fmt]}. Pick another format or use Chrome, Edge or Firefox.`));
-    return blob;
-  } catch (e) {
-    throw e.message ? e : new Error('This image could not be read, or it is too large for the browser.');
+    try { return await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+    catch { return await createImageBitmap(file); }
+  } catch {                                           // e.g. SVG: let an <img> decode it
+    const url = URL.createObjectURL(file), img = new Image();
+    try { img.src = url; await img.decode(); return img; } finally { URL.revokeObjectURL(url); }
   }
 }
-function addImage(file) {
-  const src = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[file.type] || extOf(file.name);
-  const card = new Card({ kind: 'Image', title: file.name, sub: `${FMT[src] || ''} ${size(file.size)}`.trim(), icon: 'image' });
-  const img = el('img', 'w-full h-full object-cover'); img.alt = ''; img.src = URL.createObjectURL(file);
-  card.thumb(img);
-
-  let url;
-  const chips = Object.keys(FMT).filter((f) => f !== src).map((f) => [f, btn(`Convert to ${FMT[f]}`, 'chip', () => run(f))]);
-  const run = async (fmt) => {
-    chips.forEach(([f, b]) => b.classList.toggle('on', f === fmt));
-    card.actions(); card.progress(40, 'Converting…');
-    try {
-      await tick();
-      const blob = await convertImage(file, fmt);
-      if (url) URL.revokeObjectURL(url);
-      url = URL.createObjectURL(blob);
-      const diff = Math.round((1 - blob.size / file.size) * 100);
-      card.done(`${FMT[fmt]}, ${size(blob.size)}, ${diff >= 0 ? diff + '% smaller' : -diff + '% larger'}`);
-      card.actions(dl(url, `${baseOf(file.name)}.${fmt}`));
-    } catch (e) { card.fail(e.message); }
-  };
-  card.controls(...chips.map((c) => c[1]));
-  run(src === 'webp' ? 'png' : 'webp');            // sensible default, starts instantly
+async function canvasConvert(file, t) {
+  const src = await decodeImage(file);
+  const w = src.naturalWidth || src.width || 1024, h = src.naturalHeight || src.height || 1024;
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  if (t === 'jpg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); }   // JPG has no transparency
+  ctx.drawImage(src, 0, 0, w, h); src.close?.();
+  const blob = await new Promise((r) => c.toBlob(r, NATIVE[t], 0.92));
+  return blob && blob.type === NATIVE[t] ? blob : null;                  // null: this browser cannot encode it
 }
 
-/* ---------- flow 2: video to MP3 (decoded and encoded in the browser) ---------- */
+/* ---------- ffmpeg.wasm for everything else (loaded on first use) ---------- */
+let ffP, ffChain = Promise.resolve();
+const loadScript = (src) => new Promise((ok, no) => {
+  const s = document.createElement('script'); s.src = src; s.onload = ok;
+  s.onerror = () => no(new Error('Could not load the converter engine. Reload and try again.'));
+  document.head.append(s);
+});
+function getFFmpeg() {
+  ffP ??= (async () => {
+    await loadScript('vendor/ffmpeg/ffmpeg.js');
+    const ff = new FFmpegWrapper.FFmpeg();
+    await ff.load({
+      coreURL: new URL('vendor/ffmpeg/ffmpeg-core.js', location.href).href,
+      wasmURL: new URL('vendor/ffmpeg/ffmpeg-core.wasm', location.href).href,
+    });
+    return ff;
+  })().catch((e) => { ffP = null; throw e; });
+  return ffP;
+}
+function ffConvert(blob, inExt, kind, t, on) {
+  const job = ffChain.then(async () => {                 // one conversion at a time
+    on(4, 'Loading converter (first time only, about 30 MB)…');
+    const ff = await getFFmpeg();
+    const inName = `in.${inExt.replace(/[^a-z0-9]/g, '') || 'bin'}`, outName = `out.${t}`;
+    const onProg = ({ progress }) => on(25 + Math.max(0, Math.min(1, progress || 0)) * 70, 'Converting…');
+    try {
+      on(25, 'Converting…');
+      await ff.writeFile(inName, new Uint8Array(await blob.arrayBuffer()));
+      ff.on('progress', onProg);
+      const code = await ff.exec(['-i', inName, ...ffArgs(kind, t), outName]);
+      if (code !== 0) throw Object.assign(new Error(`This file could not be converted to ${t.toUpperCase()}. It may be corrupt, or that combination is not supported.`), { soft: true });
+      return new Blob([await ff.readFile(outName)]);
+    } catch (e) {
+      if (e.soft) throw e;
+      try { ff.terminate(); } catch {}
+      ffP = null;
+      throw new Error('The converter ran out of memory or stopped. Try a smaller file.');
+    } finally {
+      ff.off('progress', onProg);
+      for (const f of [inName, outName]) ff.deleteFile(f).catch(() => {});
+    }
+  });
+  ffChain = job.catch(() => {});
+  return job;
+}
+
+/* ---------- audio: the browser decodes and lamejs encodes MP3 (fast path) ---------- */
 async function toMp3(file, onProgress) {
-  if (!window.lamejs) throw new Error('The MP3 encoder did not load. Check your connection and reload.');
+  if (!window.lamejs) throw new Error('The MP3 encoder did not load.');
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   let audio;
-  try { audio = await ctx.decodeAudioData(await file.arrayBuffer()); }
-  catch { throw new Error('This browser could not read audio from the file. It may have no audio track, use an unsupported format, or be too large for browser memory.'); }
-  finally { ctx.close(); }
-
+  try { audio = await ctx.decodeAudioData(await file.arrayBuffer()); } finally { ctx.close(); }
   const ch = Math.min(audio.numberOfChannels, 2);
   const enc = new lamejs.Mp3Encoder(ch, audio.sampleRate, 192);
   const pcm = (f) => { const o = new Int16Array(f.length); for (let i = 0; i < f.length; i++) { const v = Math.max(-1, Math.min(1, f[i])); o[i] = v < 0 ? v * 0x8000 : v * 0x7fff; } return o; };
@@ -154,20 +206,62 @@ async function toMp3(file, onProgress) {
     const l = pcm(left.subarray(i, i + step));
     const buf = right ? enc.encodeBuffer(l, pcm(right.subarray(i, i + step))) : enc.encodeBuffer(l);
     if (buf.length) out.push(buf);
-    if (n % 10 === 0) { onProgress(i / audio.length); await tick(); }   // keep the page responsive
+    if (n % 10 === 0) { onProgress(i / audio.length); await tick(); }
   }
   const end = enc.flush();
   if (end.length) out.push(end);
   return new Blob(out, { type: 'audio/mpeg' });
 }
-async function addVideo(file) {
-  const card = new Card({ kind: 'Video to MP3', title: file.name, sub: size(file.size), icon: 'audio' });
-  try {
-    card.progress(5, 'Reading audio…'); await tick();
-    const blob = await toMp3(file, (p) => card.progress(10 + p * 90, 'Encoding MP3…'));
-    card.done(`MP3, ${size(blob.size)}`);
-    card.actions(dl(URL.createObjectURL(blob), `${baseOf(file.name)}.mp3`));
-  } catch (e) { card.fail(e.message); }
+
+/* ---------- one entry point: pick the best engine ---------- */
+async function convert(file, kind, src, t, on) {
+  if (kind === 'image') {
+    if (NATIVE[t]) { const b = await canvasConvert(file, t).catch(() => null); if (b) return b; }
+    else if (!FF_IMG.has(src)) {                           // AVIF, SVG and friends: decode in the browser, hand ffmpeg a PNG
+      const png = await canvasConvert(file, 'png').catch(() => null);
+      if (png) return ffConvert(png, 'png', kind, t, on);
+    }
+  } else if (t === 'mp3') {
+    try { on(10, 'Reading audio…'); return await toMp3(file, (p) => on(10 + p * 90, 'Encoding MP3…')); } catch {}
+  }
+  return ffConvert(file, src, kind, t, on);
+}
+
+function addFile(file, kind) {
+  const src = extOf(file.name);
+  const first = kind === 'image' ? (src === 'webp' ? 'png' : 'webp') : kind === 'video' ? 'mp3' : null;   // instant defaults
+  const card = new Card({
+    kind: { image: 'Image', audio: 'Audio', video: 'Video' }[kind], title: file.name,
+    sub: `${src.toUpperCase()}, ${size(file.size)}${first ? '' : '. Choose a format to convert to.'}`, icon: kind,
+  });
+  if (kind === 'image') { const img = el('img', 'w-full h-full object-cover'); img.alt = ''; img.onload = () => card.thumb(img); img.src = URL.createObjectURL(file); }
+
+  const targets = OUT[kind].filter((t) => t !== src);
+  const chips = POPULAR[kind].filter((t) => targets.includes(t)).map((t) => [t, btn(`Convert to ${t.toUpperCase()}`, 'chip', () => run(t))]);
+  const sel = el('select', 'chip');
+  sel.setAttribute('aria-label', 'Convert to another format'); sel.style.colorScheme = 'dark';
+  sel.append(new Option('More formats…', ''));
+  for (const t of targets) sel.append(new Option(t.toUpperCase(), t));
+  sel.onchange = () => sel.value && run(sel.value);
+  card.controls(...chips.map((c) => c[1]), sel);
+
+  let url;
+  const run = async (t) => {
+    const chip = chips.some(([f]) => f === t);
+    chips.forEach(([f, b]) => b.classList.toggle('on', f === t));
+    sel.value = chip ? '' : t;
+    card.actions(); card.progress(8, 'Preparing…');
+    try {
+      await tick();
+      const blob = await convert(file, kind, src, t, (p, m) => card.progress(p, m));
+      if (url) URL.revokeObjectURL(url);
+      url = URL.createObjectURL(blob);
+      const diff = Math.round((1 - blob.size / file.size) * 100);
+      card.done(`${t.toUpperCase()}, ${size(blob.size)}${kind === 'image' ? (diff >= 0 ? `, ${diff}% smaller` : `, ${-diff}% larger`) : ''}`);
+      card.actions(dl(url, `${baseOf(file.name)}.${t}`));
+    } catch (e) { card.fail(e.message); }
+  };
+  if (first) run(first);
 }
 
 /* ---------- flow 3: YouTube ---------- */
@@ -200,15 +294,13 @@ async function addYouTube(url) {
 /* ---------- auto-detect + input handling ---------- */
 function handleFiles(files) {
   for (const f of files) {
-    const e = extOf(f.name);
-    if (/^image\/(jpeg|png|webp)$/.test(f.type) || ['jpg', 'png', 'webp'].includes(e)) addImage(f);
-    else if (['mp4', 'm4v', 'mov', 'webm', 'mkv'].includes(e) || f.type.startsWith('video/')) addVideo(f);
-    else toast(`${f.name} is not supported. Use JPG, PNG, WebP or MP4.`);
+    const k = kindOf(extOf(f.name));
+    if (k) addFile(f, k); else toast(`.${extOf(f.name) || 'unknown'} files are not supported yet.`);
   }
 }
 function handleText(text) {
   const raw = (text.match(/(?:https?:\/\/)?(?:[\w-]+\.)?(?:youtube\.com|youtu\.be)\/\S+/i) || [])[0];
-  if (!raw) return toast('Drop an image or an MP4 to convert it.');
+  if (!raw) return toast('Drop a file to convert it.');
   addYouTube(/^https?:/i.test(raw) ? raw : 'https://' + raw);
 }
 
