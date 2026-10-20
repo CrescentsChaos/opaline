@@ -69,7 +69,6 @@
   .check { appearance: none; width: 2.5rem; height: 1.4rem; border-radius: 9999px; background: rgba(255,255,255,.15); position: relative; cursor: pointer; transition: background .2s; flex: none; }
   .check::after { content: ''; position: absolute; top: 3px; left: 3px; width: 1rem; height: 1rem; border-radius: 9999px; background: #fff; transition: transform .2s; }
   .check:checked { background: var(--iris); } .check:checked::after { transform: translateX(1.1rem); }
-<<<<<<< HEAD
 
   /* background remover */
   .checker { background-color: #cfd5e3; background-image: linear-gradient(45deg,#aab2c5 25%,transparent 25%,transparent 75%,#aab2c5 75%), linear-gradient(45deg,#aab2c5 25%,transparent 25%,transparent 75%,#aab2c5 75%); background-size: 20px 20px; background-position: 0 0, 10px 10px; }
@@ -78,8 +77,6 @@
   .swatch { width: 2.1rem; height: 2.1rem; border-radius: 9999px; border: 2px solid rgba(255,255,255,.25); transition: transform .15s, border-color .15s; flex: none; }
   .swatch:hover { transform: scale(1.08); } .swatch.on { border-color: var(--mint); box-shadow: 0 0 0 2px #0a0f1e, 0 0 0 4px var(--mint); }
   input[type=range].rng { accent-color: #5eead4; width: 100%; }
-=======
->>>>>>> d3c32cda1a0f89d302fbddcd8f9fa3f1a1998bd1
 </style>
 </head>
 <body class="font-sans min-h-screen antialiased">
@@ -95,16 +92,10 @@
     <h1 id="headline" class="text-4xl sm:text-5xl font-extrabold tracking-tight">Drop it. Convert it. Download.</h1>
     <p id="lede" class="mt-3 text-slate-400 max-w-lg"><span id="ledeText"></span><span id="ytNote" class="hidden"> Paste a YouTube link to download it.</span></p>
 
-<<<<<<< HEAD
     <div class="tabs mt-6 max-w-full overflow-x-auto" role="tablist" aria-label="Tool">
       <button type="button" role="tab" class="tab" data-tab-btn="convert">Convert files</button>
       <button type="button" role="tab" class="tab" data-tab-btn="gif">Video to GIF</button>
       <button type="button" role="tab" class="tab" data-tab-btn="bg">Remove background</button>
-=======
-    <div class="tabs mt-6" role="tablist" aria-label="Tool">
-      <button type="button" role="tab" class="tab" data-tab-btn="convert">Convert files</button>
-      <button type="button" role="tab" class="tab" data-tab-btn="gif">Video to GIF</button>
->>>>>>> d3c32cda1a0f89d302fbddcd8f9fa3f1a1998bd1
     </div>
 
     <!-- ===== Convert ===== -->
@@ -238,7 +229,6 @@
         </div>
       </section>
     </div>
-<<<<<<< HEAD
     <!-- ===== Remove background ===== -->
     <div id="bgPane" class="hidden">
       <section id="bgDrop" class="glass rounded-3xl p-4 sm:p-6 mt-6">
@@ -299,8 +289,6 @@
         </div>
       </section>
     </div>
-=======
->>>>>>> d3c32cda1a0f89d302fbddcd8f9fa3f1a1998bd1
     <p id="footnote" class="mt-10 text-xs text-slate-500"></p>
   </main>
 
@@ -309,9 +297,6 @@
   <script src="config.js"></script>
   <script src="app.js"></script>
   <script src="gif.js"></script>
-<<<<<<< HEAD
   <script src="bg.js"></script>
-=======
->>>>>>> d3c32cda1a0f89d302fbddcd8f9fa3f1a1998bd1
 </body>
 </html>
