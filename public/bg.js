@@ -89,7 +89,7 @@ window.BgEditor = (() => {
   function showError(m) { $('#bErr').textContent = m; show('#bErr', !!m); }
   function syncUi() {
     const ok = st.ready && !st.busy;
-    $('#bSave').disabled = !ok; $('#bCompare').disabled = !ok; $('#bUndo').disabled = !ok || !st.undo.length;
+    $('#bSave').disabled = !ok; $('#bToPhoto').disabled = !ok; $('#bCompare').disabled = !ok; $('#bUndo').disabled = !ok || !st.undo.length;
     for (const b of $('#bTools').children) b.disabled = !ok;
     view.style.cursor = ok && st.tool ? 'none' : 'default';
     $('#bSave').textContent = `Download ${FORMATS[st.fmt][0]}`;
@@ -202,19 +202,30 @@ window.BgEditor = (() => {
     for (let y = 0; y < st.h; y++) for (let x = 0, i = y * st.w * 4 + 3; x < st.w; x++, i += 4) if (data[i] > 8) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
     return x1 < 0 ? { x: 0, y: 0, w: st.w, h: st.h } : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
   }
-  async function save() {
-    if (!st.ready || st.busy) return;
+  async function makeBlob() {
     const [, mime, ext] = FORMATS[st.fmt], r = st.trim ? alphaBounds() : { x: 0, y: 0, w: st.w, h: st.h };
     const c = document.createElement('canvas'); c.width = r.w; c.height = r.h; const g = c.getContext('2d');
     const fill = st.bg || (mime === 'image/jpeg' ? '#ffffff' : null);       // JPG has no transparency
     if (fill) { g.fillStyle = fill; g.fillRect(0, 0, r.w, r.h); }
     g.drawImage(cut, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
-    const blob = await new Promise((ok) => c.toBlob(ok, mime, 0.95));
+    return { blob: await new Promise((ok) => c.toBlob(ok, mime, 0.95)), ext };
+  }
+  async function save() {
+    if (!st.ready || st.busy) return;
+    const { blob, ext } = await makeBlob();
     if (!blob) return toast(`This browser cannot save ${ext.toUpperCase()}. Try PNG.`);
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${baseOf(st.file.name)}-no-bg.${ext}`;
     document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   }
-  $('#bSave').onclick = save;
+  async function toPhoto() {                                  // cutout (always PNG, keeps transparency) -> photo editor
+    if (!st.ready || st.busy) return;
+    const c = document.createElement('canvas'); c.width = st.w; c.height = st.h; const g = c.getContext('2d');
+    if (st.bg) { g.fillStyle = st.bg; g.fillRect(0, 0, st.w, st.h); }
+    g.drawImage(cut, 0, 0);
+    const blob = await new Promise((ok) => c.toBlob(ok, 'image/png'));
+    if (blob) openPhotoEditor([new File([blob], `${baseOf(st.file.name)}-cutout.png`, { type: 'image/png' })]);
+  }
+  $('#bSave').onclick = save; $('#bToPhoto').onclick = toPhoto;
 
   /* ---------- wiring ---------- */
   $('#bgFile').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) load(f); };

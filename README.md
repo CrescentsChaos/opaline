@@ -4,7 +4,8 @@ Drop a file, pick a format, download. Everything runs in your browser; nothing i
 
 - **Video to GIF:** open the *Video to GIF* tab (or tap *Edit as GIF* on a video), trim the clip, crop the frame, choose width, frame rate and speed, then download.
 
-- **Remove background:** open the *Remove background* tab (or tap *Remove background* on an image). The cutout runs in your browser, then you can erase or restore areas with the brush, pick a background colour, trim the empty space and download PNG, JPG or WebP.
+- **Edit photo:** open the *Edit photo* tab (or tap *Edit photo* on an image). Add overlay images and work on them as layers: crop the canvas, copy a layer, send it to front or back, place it by alignment, percentage or exact pixels, size it by percentage or exact pixels, and adjust opacity, colour (brightness, contrast, saturation, hue, warmth, tint) and texture (grain, paper, canvas, dots). Undo and redo are built in. Arrow keys nudge, Delete removes, Ctrl+D copies, Ctrl+Z undoes.
+- **Remove background:** open the *Remove background* tab (or tap *Remove background* on an image). The cutout runs in your browser, then you can erase or restore areas with the brush, pick a background colour, trim the empty space and download PNG, JPG or WebP, or send the cutout to the photo editor as an overlay.
 - **Inputs:** about 164 file extensions (images, audio, video).
 - **Outputs:** about 39 formats, such as JPG, PNG, WebP, GIF, BMP, TIFF, ICO, MP3, WAV, FLAC, OGG, OPUS, AAC, M4A, MP4, MKV, MOV, WebM, AVI.
 - **Engines:** the browser's own image tools and a built-in MP3 encoder for quick jobs. Everything else uses ffmpeg.wasm, downloaded the first time it is needed (about 30 MB).

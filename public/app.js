@@ -257,7 +257,7 @@ function addFile(file, kind) {
   sel.append(new Option('More formats…', ''));
   for (const t of targets) sel.append(new Option(t.toUpperCase(), t));
   sel.onchange = () => sel.value && run(sel.value);
-  card.controls(...chips.map((c) => c[1]), sel, ...(kind === 'video' ? [btn('Edit as GIF…', 'chip', () => openGifEditor(file))] : kind === 'image' ? [btn('Remove background', 'chip', () => openBgEditor(file))] : []));
+  card.controls(...chips.map((c) => c[1]), sel, ...(kind === 'video' ? [btn('Edit as GIF…', 'chip', () => openGifEditor(file))] : kind === 'image' ? [btn('Edit photo', 'chip', () => openPhotoEditor([file])), btn('Remove background', 'chip', () => openBgEditor(file))] : []));
 
   let url;
   const run = async (t) => {
@@ -311,6 +311,7 @@ function handleFiles(files) {
     const v = [...files].find((f) => kindOf(extOf(f.name)) === 'video');
     return v ? openGifEditor(v) : toast('Choose a video file to make a GIF.');
   }
+  if (currentTab() === 'photo') return window.PhotoEditor.load(files);
   if (currentTab() === 'bg') {
     const im = [...files].find((f) => kindOf(extOf(f.name)) === 'image' || f.type.startsWith('image/'));
     return im ? openBgEditor(im) : toast('Choose an image to remove its background.');
@@ -330,6 +331,7 @@ function handleText(text) {
 const COPY = {
   convert: ['Drop it. Convert it. Download.', 'Convert between 164+ file types: images, audio and video. Nothing leaves your browser.', 'Drop to convert', 'Images and videos are converted in your browser and never uploaded.'],
   gif: ['Turn any video into a GIF.', 'Trim the clip, crop the frame and download. Nothing leaves your browser.', 'Drop a video to edit', 'Videos are edited in your browser and never uploaded.'],
+  photo: ['Edit your photo.', 'Add overlay images, crop, resize, recolour and texture them, then download. Nothing leaves your browser.', 'Drop images to edit', 'Images are edited in your browser and never uploaded.'],
   bg: ['Remove any background.', 'Upload a photo and get a clean cutout, then fix the edges with the brush. Nothing leaves your browser.', 'Drop an image', 'Images are processed in your browser and never uploaded.'],
 };
 const currentTab = () => document.body.dataset.tab || 'convert';
@@ -339,13 +341,14 @@ function setTab(name) {
     const on = b.dataset.tabBtn === name;
     b.setAttribute('aria-selected', on); b.classList.toggle('on', on);
   }
-  for (const [k, id] of [['convert', '#convertPane'], ['gif', '#gifPane'], ['bg', '#bgPane']]) $(id).classList.toggle('hidden', k !== name);
+  for (const [k, id] of [['convert', '#convertPane'], ['photo', '#photoPane'], ['bg', '#bgPane'], ['gif', '#gifPane']]) $(id).classList.toggle('hidden', k !== name);
   const [head, lede, drop, foot] = COPY[name];
   $('#headline').textContent = head; $('#ledeText').textContent = lede;
   $('#ytNote').classList.toggle('hidden', !(ytOn && name === 'convert'));
   $('#overlayText').textContent = drop; $('#footnote').textContent = foot;
 }
 for (const b of document.querySelectorAll('[data-tab-btn]')) b.onclick = () => setTab(b.dataset.tabBtn);
+function openPhotoEditor(files) { setTab('photo'); window.PhotoEditor.load(files); scrollTo({ top: 0, behavior: 'smooth' }); }
 function openBgEditor(file) { setTab('bg'); window.BgEditor.load(file); scrollTo({ top: 0, behavior: 'smooth' }); }
 function openGifEditor(file) { setTab('gif'); window.GifEditor.load(file); scrollTo({ top: 0, behavior: 'smooth' }); }
 setTab('convert');
