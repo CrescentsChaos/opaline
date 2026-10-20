@@ -1,10 +1,12 @@
 {
   "name": "opaline",
   "version": "1.0.0",
-  "description": "Opaline: convert images and MP4 to MP3 in the browser. Optional backend for YouTube downloads.",
+  "description": "Opaline: convert files and turn videos into GIFs in the browser. Optional backend for YouTube downloads.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "vendor": "node scripts/vendor.js",
+    "postinstall": "node scripts/vendor.js"
   },
   "engines": {
     "node": ">=18"
@@ -12,5 +14,9 @@
   "dependencies": {
     "express": "^4.21.2",
     "ffmpeg-static": "^5.2.0"
+  },
+  "devDependencies": {
+    "@ffmpeg/ffmpeg": "0.12.10",
+    "@ffmpeg/core": "0.12.6"
   }
 }

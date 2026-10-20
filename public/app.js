@@ -74,7 +74,8 @@ const API = (window.OPALINE?.api || '').replace(/\/$/, '');
 const tick = () => new Promise((r) => setTimeout(r));
 const yt = fetch(`${API}/api/health`).then((r) => (r.ok ? r.json() : {})).then((c) => !!c.ytdlp).catch(() => false);
 // the link box only appears when a YouTube backend is connected (see config.js)
-yt.then((ok) => { if (ok) { $('#yt').classList.remove('hidden'); $('#lede').append(' Paste a YouTube link to download it.'); } });
+let ytOn = false;
+yt.then((ok) => { if (ok) { ytOn = true; $('#yt').classList.remove('hidden'); setTab(currentTab()); } });
 
 // follow a backend job over SSE
 const follow = (id, onProgress) => new Promise((ok, no) => {
@@ -155,7 +156,9 @@ const loadScript = (src) => new Promise((ok, no) => {
 function getFFmpeg() {
   ffP ??= (async () => {
     await loadScript('vendor/ffmpeg/ffmpeg.js');
-    const ff = new FFmpegWrapper.FFmpeg();
+    const NS = window.FFmpegWASM || window.FFmpegWrapper;      // the UMD build exposes FFmpegWASM
+    if (!NS?.FFmpeg) throw new Error('The converter engine did not load correctly. Reload and try again.');
+    const ff = new NS.FFmpeg();
     await ff.load({
       coreURL: new URL('vendor/ffmpeg/ffmpeg-core.js', location.href).href,
       wasmURL: new URL('vendor/ffmpeg/ffmpeg-core.wasm', location.href).href,
@@ -163,6 +166,17 @@ function getFFmpeg() {
     return ff;
   })().catch((e) => { ffP = null; throw e; });
   return ffP;
+}
+// run any job on the shared ffmpeg instance (one at a time)
+function ffJob(fn) {
+  const job = ffChain.then(async () => fn(await getFFmpeg()));
+  ffChain = job.catch(() => {});
+  return job;
+}
+// stop whatever ffmpeg is doing and start fresh next time
+function resetFF() {
+  const p = ffP; ffP = null;
+  p?.then((ff) => { try { ff.terminate(); } catch {} }).catch(() => {});
 }
 function ffConvert(blob, inExt, kind, t, on) {
   const job = ffChain.then(async () => {                 // one conversion at a time
@@ -243,7 +257,7 @@ function addFile(file, kind) {
   sel.append(new Option('More formats…', ''));
   for (const t of targets) sel.append(new Option(t.toUpperCase(), t));
   sel.onchange = () => sel.value && run(sel.value);
-  card.controls(...chips.map((c) => c[1]), sel);
+  card.controls(...chips.map((c) => c[1]), sel, ...(kind === 'video' ? [btn('Edit as GIF…', 'chip', () => openGifEditor(file))] : []));
 
   let url;
   const run = async (t) => {
@@ -293,6 +307,10 @@ async function addYouTube(url) {
 
 /* ---------- auto-detect + input handling ---------- */
 function handleFiles(files) {
+  if (currentTab() === 'gif') {
+    const v = [...files].find((f) => kindOf(extOf(f.name)) === 'video');
+    return v ? openGifEditor(v) : toast('Choose a video file to make a GIF.');
+  }
   for (const f of files) {
     const k = kindOf(extOf(f.name));
     if (k) addFile(f, k); else toast(`.${extOf(f.name) || 'unknown'} files are not supported yet.`);
@@ -303,6 +321,30 @@ function handleText(text) {
   if (!raw) return toast('Drop a file to convert it.');
   addYouTube(/^https?:/i.test(raw) ? raw : 'https://' + raw);
 }
+
+/* ---------- tabs: Convert files | Video to GIF ---------- */
+const COPY = {
+  convert: ['Drop it. Convert it. Download.', 'Convert between 164+ file types: images, audio and video. Nothing leaves your browser.'],
+  gif: ['Turn any video into a GIF.', 'Trim the clip, crop the frame and download. Nothing leaves your browser.'],
+};
+const currentTab = () => document.body.dataset.tab || 'convert';
+function setTab(name) {
+  document.body.dataset.tab = name;
+  for (const b of document.querySelectorAll('[data-tab-btn]')) {
+    const on = b.dataset.tabBtn === name;
+    b.setAttribute('aria-selected', on); b.classList.toggle('on', on);
+  }
+  $('#convertPane').classList.toggle('hidden', name !== 'convert');
+  $('#gifPane').classList.toggle('hidden', name !== 'gif');
+  $('#headline').textContent = COPY[name][0];
+  $('#ledeText').textContent = COPY[name][1];
+  $('#ytNote').classList.toggle('hidden', !(ytOn && name === 'convert'));
+  $('#overlayText').textContent = name === 'gif' ? 'Drop a video to edit' : 'Drop to convert';
+  $('#footnote').textContent = name === 'gif' ? 'Videos are edited in your browser and never uploaded.' : 'Images and videos are converted in your browser and never uploaded.';
+}
+for (const b of document.querySelectorAll('[data-tab-btn]')) b.onclick = () => setTab(b.dataset.tabBtn);
+function openGifEditor(file) { setTab('gif'); window.GifEditor.load(file); scrollTo({ top: 0, behavior: 'smooth' }); }
+setTab('convert');
 
 $('#file').onchange = (e) => { handleFiles(e.target.files); e.target.value = ''; };
 $('#linkForm').onsubmit = (e) => { e.preventDefault(); const v = $('#link').value; $('#link').value = ''; if (v.trim()) handleText(v); };
