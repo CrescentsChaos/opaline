@@ -49,7 +49,7 @@
   <main class="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
     <p class="text-xl font-semibold tracking-tight text-teal-200 mb-6">Opaline</p>
     <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight">Drop it. Convert it. Download.</h1>
-    <p class="mt-3 text-slate-400 max-w-lg">Convert JPG, PNG and WebP images, turn MP4 videos into MP3, or paste a YouTube link. We detect the type for you.</p>
+    <p id="lede" class="mt-3 text-slate-400 max-w-lg">Convert JPG, PNG and WebP images, or turn MP4 videos into MP3. We detect the type for you.</p>
 
     <section class="glass rounded-3xl p-4 sm:p-6 mt-8">
       <label class="drop block rounded-2xl text-center cursor-pointer px-4 py-10 sm:py-14">
@@ -61,6 +61,7 @@
         <span class="block text-sm text-slate-400 mt-1">Images (JPG, PNG, WebP) and videos (MP4)</span>
       </label>
 
+      <div id="yt" class="hidden">
       <div class="flex items-center gap-3 my-4 text-xs text-slate-500"><span class="h-px flex-1 bg-white/10"></span>or paste a link<span class="h-px flex-1 bg-white/10"></span></div>
 
       <form id="linkForm" class="flex gap-2">
@@ -68,11 +69,11 @@
                class="min-w-0 flex-1 rounded-xl bg-white/5 border border-white/10 px-4 py-3 placeholder:text-slate-500 focus:border-teal-300 focus:outline-none">
         <button class="chip font-semibold">Fetch video</button>
       </form>
-      <p id="warn" class="hidden mt-3 text-sm text-amber-300">YouTube downloads are off: no backend with yt-dlp is connected (see README).</p>
+      </div>
     </section>
 
     <section id="list" class="mt-6 space-y-3" aria-live="polite"></section>
-    <p class="mt-10 text-xs text-slate-500">Images and videos are converted in your browser and never uploaded. YouTube downloads run on the connected backend. Only download content you own or have permission to use.</p>
+    <p class="mt-10 text-xs text-slate-500">Images and videos are converted in your browser and never uploaded.</p>
   </main>
 
   <div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-6 z-50 glass rounded-xl px-4 py-2.5 text-sm opacity-0 pointer-events-none transition-opacity duration-300"></div>

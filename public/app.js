@@ -73,7 +73,8 @@ class Card {
 const API = (window.OPALINE?.api || '').replace(/\/$/, '');
 const tick = () => new Promise((r) => setTimeout(r));
 const yt = fetch(`${API}/api/health`).then((r) => (r.ok ? r.json() : {})).then((c) => !!c.ytdlp).catch(() => false);
-yt.then((ok) => { if (!ok) $('#warn').classList.remove('hidden'); });
+// the link box only appears when a YouTube backend is connected (see config.js)
+yt.then((ok) => { if (ok) { $('#yt').classList.remove('hidden'); $('#lede').append(' Paste a YouTube link to download it.'); } });
 
 // follow a backend job over SSE
 const follow = (id, onProgress) => new Promise((ok, no) => {
@@ -207,7 +208,7 @@ function handleFiles(files) {
 }
 function handleText(text) {
   const raw = (text.match(/(?:https?:\/\/)?(?:[\w-]+\.)?(?:youtube\.com|youtu\.be)\/\S+/i) || [])[0];
-  if (!raw) return toast('Paste a YouTube link, or drop an image or MP4.');
+  if (!raw) return toast('Drop an image or an MP4 to convert it.');
   addYouTube(/^https?:/i.test(raw) ? raw : 'https://' + raw);
 }
 
